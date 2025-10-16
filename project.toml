@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "easy_st_aggrid"
+version = "2025.10.16"
+description = "Toolkit for creating 'columnDefs' in a more pythonistic way for the 'streamlit-aggrid' component"
+readme = "README.md"
+authors = [
+  { name="Pablo GP", email="pablogonzalezpila@gmail.com" }
+]
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+
+dependencies = [
+  # "streamlit-aggrid>=1.1.9,<2.0.0",
+  "streamlit-aggrid",
+]
+
+[project.urls]
+Homepage = "https://github.com/PaulFilms/easy_streamlit_aggrid"
+Repository = "https://github.com/PaulFilms/easy_streamlit_aggrid"
