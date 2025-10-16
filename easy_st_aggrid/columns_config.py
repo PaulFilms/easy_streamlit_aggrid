@@ -27,9 +27,7 @@ __all__ = [
 
 from dataclasses import dataclass, asdict, field
 from typing import Optional, Union, List, Tuple, Dict, Any
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    import pandas as pd
+import pandas as pd
 
 from st_aggrid import AgGrid, JsCode, GridOptionsBuilder
 
@@ -108,7 +106,7 @@ class col_base:
     cellStyle: Optional[Dict[str, Any]] = None
 
     columnGroupShow: Union[bool, str, None] = None
-    children: Optional[List[col_base]] = None
+    children: Optional[List['col_base']] = None
     kwargs: Optional[Dict[str, Any]] = field(default_factory=dict)
     
 
@@ -215,12 +213,12 @@ class col_checkbox(col_base):
 
 ## TABLE
 
-def _columns_config(cls, columnas: List[col_base]) -> List[Dict]:
+def _columns_config(columns_list: List[col_base]) -> List[Dict]:
     '''
     Returns a list of dicts to be used in AgGrid columnDefs
     '''
     # Recibe una lista de objetos col_base y devuelve lista de dicts
-    return [col.data() for col in columnas]
+    return [col.data() for col in columns_list]
 
 def easy_table(
         dataframe: 'pd.DataFrame', 
@@ -245,7 +243,7 @@ def easy_table(
 
     grid_options['defaultColDef']["cellStyle"] = cell_style.to_dict()
     # grid_options['getRowStyle'] = row_style_js  # gb.configure_grid_options(getRowStyle=row_style_js)
-    grid_options['columnDefs'] = _columns_config(columns_list) #  or col.children
+    grid_options['columnDefs'] = _columns_config(columns_list=columns_list) #  or col.children
     grid_options['suppressMovableColumns'] = True # Bloquear reordenar columnas
     grid_options['rowHeight'] = 50 # Definir altura fija de filas
     grid_options['columnDefs'][0]['checkboxSelection'] = True

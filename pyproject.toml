@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "easy_st_aggrid"
-version = "2025.10.16"
+version = "2025.10.16.2"
 description = "Toolkit for creating 'columnDefs' in a more pythonistic way for the 'streamlit-aggrid' component"
 readme = "README.md"
 authors = [
