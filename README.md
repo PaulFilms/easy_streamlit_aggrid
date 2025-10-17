@@ -61,7 +61,7 @@ if selection is not None and len(selection) > 0:
 
 ```Python
 
-from easy_st_aggrid import col_base, col_text, col_date, col_checkbox, easy_table
+from easy_st_aggrid import col_base, col_text, col_date, col_checkbox, easy_table, JsCode
 
 cell_style_dias = JsCode("""
    function(params) {
