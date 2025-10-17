@@ -17,7 +17,7 @@ Table
 easy_table
 '''
 
-from columns_config import \
+from easy_st_aggrid.columns_config import \
     col_base, \
     col_text, \
     col_date, \
