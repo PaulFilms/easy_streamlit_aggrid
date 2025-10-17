@@ -3,6 +3,7 @@ Toolkit to create 'columnDefs' in a more pythonist way
 
 Columns
 -------
+col_base
 col_text
 col_date
 col_checkbox
@@ -15,15 +16,6 @@ Table
 -----
 easy_table
 '''
-__all__ = [
-    "JsCode",
-    "cell_style",
-    "col_base",
-    "col_text",
-    "col_date",
-    "col_checkbox",
-    "easy_table",
-]
 
 from dataclasses import dataclass, asdict, field
 from typing import Optional, Union, List, Tuple, Dict, Any
