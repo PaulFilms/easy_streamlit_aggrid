@@ -16,12 +16,12 @@ Table
 -----
 easy_table
 '''
-
+import json
 from dataclasses import dataclass, asdict, field
 from typing import Optional, Union, List, Tuple, Dict, Any
 import pandas as pd
 
-from st_aggrid import AgGrid, JsCode, GridOptionsBuilder
+from st_aggrid import AgGrid, JsCode, GridOptionsBuilder, ColumnsAutoSizeMode
 
 @dataclass
 class cell_style:
@@ -216,7 +216,9 @@ def easy_table(
         dataframe: 'pd.DataFrame', 
         columns_list: List[col_base], 
         cell_style: cell_style = default_cell, 
-        fit_columns_on_grid_load: bool = True
+        getRowStyle: str = None,
+        fit_columns_on_grid_load: bool = True,
+        height: int = None,
     ) -> Any | str | pd.DataFrame | None:
     '''
     Render a dataframe with AgGrid and custom options
@@ -235,6 +237,8 @@ def easy_table(
 
     grid_options['defaultColDef']["cellStyle"] = cell_style.to_dict()
     # grid_options['getRowStyle'] = row_style_js  # gb.configure_grid_options(getRowStyle=row_style_js)
+    if getRowStyle:
+        grid_options['getRowStyle'] = JsCode(getRowStyle)
     grid_options['columnDefs'] = _columns_config(columns_list=columns_list) #  or col.children
     grid_options['suppressMovableColumns'] = True # Bloquear reordenar columnas
     grid_options['rowHeight'] = 50 # Definir altura fija de filas
@@ -248,8 +252,9 @@ def easy_table(
         df,
         gridOptions=grid_options,
         allow_unsafe_jscode=True,
-        height=None,  # opcional, ignora alto fijo
+        height=height,  # opcional, ignora alto fijo
         fit_columns_on_grid_load=fit_columns_on_grid_load,
+        columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
         domLayout="autoHeight",
         theme='streamlit'
     )
