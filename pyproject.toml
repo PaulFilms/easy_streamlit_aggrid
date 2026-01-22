@@ -17,11 +17,12 @@ dependencies = [
 ]
 
 [tool.setuptools]
+packages = ["easy_st_aggrid"]
 include-package-data = true
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["easy_st_aggrid*"]
+# [tool.setuptools.packages.find]
+# where = ["."]
+# include = ["easy_st_aggrid*"]
 
 [project.urls]
 "Homepage" = "https://github.com/PaulFilms/easy_streamlit_aggrid"
