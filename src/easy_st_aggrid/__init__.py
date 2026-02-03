@@ -16,7 +16,7 @@ Table
 -----
 easy_table
 '''
-
+from ._version import __version__
 from easy_st_aggrid.columns_config import \
     col_base, \
     col_text, \

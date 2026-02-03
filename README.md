@@ -81,6 +81,13 @@ columns_config = [
 
 ```
 
+<br>
+
+## ⚠️ Warnings
+
+- If the aggrid table is in another Streamlit layout such as St.Tab, the aggrid table does not render
+- At the moment, only the following types of columns are implemented: col_text, col_date, col_checkbox
+
 
 
 [github_badge]: https://badgen.net/badge/icon/GitHub?icon=github&color=black&label

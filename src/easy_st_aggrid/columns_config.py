@@ -21,6 +21,7 @@ from dataclasses import dataclass, asdict, field
 from typing import Optional, Union, List, Tuple, Dict, Any
 import pandas as pd
 
+import streamlit as st
 from st_aggrid import AgGrid, JsCode, GridOptionsBuilder, ColumnsAutoSizeMode
 
 @dataclass
@@ -163,19 +164,44 @@ class col_date(col_base):
             ## Se opta por agTextColumnFilter en vez de agDateColumnFilter por simplicidad
             self.filter = 'agTextColumnFilter' # "agDateColumnFilter", "filterParams": {"customFormatString": "yyyy-MM-dd", "browserDatePicker": True, "comparator": comparator}, 
         
+        # value_formatter_js = JsCode("""
+        #     function(params) {
+        #         if (params.value) {
+        #             const date = new Date(params.value);
+        #             const year = date.getFullYear();
+        #             const month = ('0' + (date.getMonth() + 1)).slice(-2);
+        #             const day = ('0' + date.getDate()).slice(-2);
+        #             return year + '-' + month + '-' + day;
+        #         } else {
+        #             return '';
+        #         }
+        #     }
+        # """)
+
         value_formatter_js = JsCode("""
-            function(params) {
-                if (params.value) {
-                    const date = new Date(params.value);
-                    const year = date.getFullYear();
-                    const month = ('0' + (date.getMonth() + 1)).slice(-2);
-                    const day = ('0' + date.getDate()).slice(-2);
-                    return year + '-' + month + '-' + day;
-                } else {
-                    return '';
-                }
+        function (params) {
+            const v = params.value;
+
+            // Null, undefined, empty string
+            if (v === null || v === undefined || v === '') {
+                return '';
             }
+
+            const date = new Date(v);
+
+            // Fecha inválida
+            if (isNaN(date.getTime())) {
+                return '';
+            }
+
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+
+            return `${year}-${month}-${day}`;
+        }
         """)
+
 
         self.kwargs.update({
             "filterParams": {"customFormatString": "yyyy-MM-dd"},
@@ -219,6 +245,7 @@ def easy_table(
         getRowStyle: str = None,
         fit_columns_on_grid_load: bool = True,
         height: int = None,
+        show_row_count: bool = False,
     ) -> Any | str | pd.DataFrame | None:
     '''
     Render a dataframe with AgGrid and custom options
@@ -246,6 +273,8 @@ def easy_table(
     # grid_options['columnDefs'][0]['headerCheckboxSelection'] = True
     # grid_options['defaultColDef']['wrapText'] = True
     # grid_options['defaultColDef']['autoHeight'] = True
+    grid_options['rowSelection'] = "single"
+    grid_options['clipboard'] = True 
 
     ## TABLE
     response = AgGrid(
@@ -253,10 +282,13 @@ def easy_table(
         gridOptions=grid_options,
         allow_unsafe_jscode=True,
         height=height,  # opcional, ignora alto fijo
-        fit_columns_on_grid_load=fit_columns_on_grid_load,
-        columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
+        # fit_columns_on_grid_load=fit_columns_on_grid_load,
+        # columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
         domLayout="autoHeight",
         theme='streamlit'
     )
+    # print(response["data"])
+    if show_row_count:
+        st.write(f'FILAS: {response["data"].shape[0]}')
 
     return response.selected_data
