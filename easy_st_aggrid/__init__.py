@@ -29,19 +29,7 @@ from easy_st_aggrid.columns_config import \
     JsCode, \
     easy_table
 
-# __all__ = [
-#     "col_base", 
-#     "col_text", 
-#     "col_date", 
-#     "col_checkbox", 
-#     "col_checkbox", 
-#     "col_checkbox", 
-#     "col_checkbox", 
-#     "cell_style", 
-#     "JsCode", 
-#     "easy_table"
-# ]
-
+## BUG: circular import when importing all the functions in columns_config.py
 # import importlib
 
 # def __getattr__(name):
