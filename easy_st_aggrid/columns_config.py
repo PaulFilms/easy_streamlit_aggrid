@@ -18,11 +18,14 @@ easy_table
 '''
 import json
 from dataclasses import dataclass, asdict, field
-from typing import Optional, Union, List, Tuple, Dict, Any
-import pandas as pd
+from typing import Optional, Union, List, Tuple, Dict, Any, TYPE_CHECKING
 
 import streamlit as st
 from st_aggrid import AgGrid, JsCode, GridOptionsBuilder, ColumnsAutoSizeMode
+
+if TYPE_CHECKING:
+    import pandas as pd
+
 
 @dataclass
 class cell_style:
@@ -243,10 +246,10 @@ def easy_table(
         columns_list: List[col_base], 
         cell_style: cell_style = default_cell, 
         getRowStyle: str = None,
-        fit_columns_on_grid_load: bool = True,
+        fit_columns_on_grid_load: bool = False,
         height: int = None,
         show_row_count: bool = False,
-    ) -> Any | str | pd.DataFrame | None:
+    ): #  -> Any | str | 'pd.DataFrame' | None
     '''
     Render a dataframe with AgGrid and custom options
     '''
@@ -282,7 +285,7 @@ def easy_table(
         gridOptions=grid_options,
         allow_unsafe_jscode=True,
         height=height,  # opcional, ignora alto fijo
-        # fit_columns_on_grid_load=fit_columns_on_grid_load,
+        fit_columns_on_grid_load=fit_columns_on_grid_load,
         # columns_auto_size_mode=ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
         domLayout="autoHeight",
         theme='streamlit'
