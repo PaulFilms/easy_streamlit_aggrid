@@ -7,6 +7,7 @@ col_base
 col_text
 col_date
 col_checkbox
+col_status ** Under Test
 
 Style
 -----
@@ -17,14 +18,13 @@ Table
 easy_table
 '''
 from ._version import __version__
+from .icons import Icons
 from easy_st_aggrid.columns_config import \
     col_base, \
     col_text, \
     col_date, \
     col_checkbox, \
-    col_checkbox, \
-    col_checkbox, \
-    col_checkbox, \
+    col_status, \
     cell_style, \
     JsCode, \
     easy_table

@@ -31,10 +31,9 @@ gb.configure_default_column(
 #     enableRangeSelection=True
 # )
 
-# gb.configure_selection("multiple")
+
 gb.configure_selection(
     selection_mode="single",
-    # selection_mode="multiple",
     use_checkbox=True
 )
 
@@ -115,111 +114,4 @@ AgGrid(
 )
 
 st.text_area('testo')
-
-
-
-
-# st.title("Simulación Tree (Community)")
-
-# # -----------------------------
-# # Datos base jerárquicos
-# # -----------------------------
-# data = [
-#     {"tipo": "padre", "id": 1, "parent": None, "nombre": "Pedido 1001"},
-#     {"tipo": "hijo", "id": 2, "parent": 1, "nombre": "Producto A"},
-#     {"tipo": "hijo", "id": 3, "parent": 1, "nombre": "Producto B"},
-#     {"tipo": "padre", "id": 4, "parent": None, "nombre": "Pedido 1002"},
-#     {"tipo": "hijo", "id": 5, "parent": 4, "nombre": "Producto C"},
-# ]
-
-# df_base = pd.DataFrame(data)
-
-# # -----------------------------
-# # Estado expandido
-# # -----------------------------
-# if "expanded" not in st.session_state:
-#     st.session_state.expanded = set()
-
-# # -----------------------------
-# # Construir dataframe visible
-# # -----------------------------
-# rows = []
-
-# for _, row in df_base.iterrows():
-#     if row["tipo"] == "padre":
-#         is_expanded = row["id"] in st.session_state.expanded
-#         icon = "🔽" if is_expanded else "▶"
-
-#         rows.append({
-#             "tree": f"{icon} {row['nombre']}",
-#             "id": row["id"],
-#             "tipo": "padre"
-#         })
-
-#         if is_expanded:
-#             children = df_base[df_base["parent"] == row["id"]]
-#             for _, child in children.iterrows():
-#                 rows.append({
-#                     "tree": f"    ↳ {child['nombre']}",
-#                     "id": child["id"],
-#                     "tipo": "hijo"
-#                 })
-
-# df = pd.DataFrame(rows)
-
-# # -----------------------------
-# # Configurar grid
-# # -----------------------------
-# gb = GridOptionsBuilder.from_dataframe(df)
-
-# gb.configure_default_column(resizable=True)
-
-# # Estilo padres en negrita
-# cell_style = JsCode("""
-# function(params) {
-#     if (params.data.tipo === 'padre') {
-#         return {fontWeight: 'bold'};
-#     }
-# }
-# """)
-
-# gb.configure_column("tree", headerName="Pedidos", cellStyle=cell_style)
-
-# gb.configure_selection(
-#     selection_mode="single",
-#     use_checkbox=True
-# )
-
-# gb.configure_grid_options(
-#     rowSelection="single",
-#     suppressRowClickSelection=True,
-#     enableRangeSelection=True
-# )
-
-# gridOptions = gb.build()
-
-# grid_response = AgGrid(
-#     df,
-#     gridOptions=gridOptions,
-#     allow_unsafe_jscode=True,
-#     fit_columns_on_grid_load=True
-# )
-
-# # -----------------------------
-# # Detectar click en padre
-# # -----------------------------
-# selected = grid_response.get("selected_rows")
-
-# if isinstance(selected, pd.DataFrame) and not selected.empty:
-#     selected_row = selected.iloc[0].to_dict()
-
-#     if selected_row["tipo"] == "padre":
-#         parent_id = selected_row["id"]
-
-#         if parent_id in st.session_state.expanded:
-#             st.session_state.expanded.remove(parent_id)
-#         else:
-#             st.session_state.expanded.add(parent_id)
-
-#         st.rerun()
 

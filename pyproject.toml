@@ -26,7 +26,7 @@ where = ["."]
 include = ["easy_st_aggrid*"]
 
 [tool.setuptools.dynamic]
-version = { attr = "easy_st_aggrid.__version__" }
+version = { attr = "easy_st_aggrid._version.__version__" }
 
 [project.urls]
 "Homepage" = "https://github.com/PaulFilms/easy_streamlit_aggrid"
