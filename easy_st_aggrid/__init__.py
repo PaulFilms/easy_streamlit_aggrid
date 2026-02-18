@@ -23,8 +23,12 @@ from easy_st_aggrid.columns_config import \
     col_base, \
     col_text, \
     col_date, \
-    col_checkbox, \
+    col_status_new, \
+    col_bool, \
+    col_bar, \
     col_status, \
+    col_progress, \
+    col_icon, \
     cell_style, \
     JsCode, \
     easy_table
