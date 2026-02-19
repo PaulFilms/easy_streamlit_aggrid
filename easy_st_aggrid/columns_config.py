@@ -25,8 +25,29 @@ from typing import Optional, Union, List, Tuple, Dict, Any, Literal, TYPE_CHECKI
 from st_aggrid import AgGrid, JsCode, GridOptionsBuilder, ColumnsAutoSizeMode
 # from icons import *
 
-if TYPE_CHECKING:
-    import pandas as pd
+import pandas as pd
+
+# if TYPE_CHECKING:
+#     import pandas as pd
+
+
+def build_hierarchy(df: pd.DataFrame, level_col: str) -> pd.DataFrame:
+    df = df.copy()
+    df = df.reset_index(drop=True)
+    stack = []
+    paths = []
+
+    for idx, row in df.iterrows():
+        lvl = int(row[level_col]) + 1  # ← normalizar: 0→1, 1→2, 2→3...
+
+        while len(stack) >= lvl:
+            stack.pop()
+
+        stack.append(str(idx))
+        paths.append(list(stack))
+
+    df["hierarchy"] = [json.dumps(p) for p in paths]
+    return df
 
 
 @dataclass
@@ -41,7 +62,7 @@ class cell_style:
     fontWeight : "bold" or None
     color: str ("#000000")
     '''
-    fontSize: Optional[int] = 15
+    fontSize: Optional[int] = 13
     fontFamily: Optional[str] = "Neo Sans, sans-serif"
     fontWeight: Optional[str] = None
     color: Optional[str] = None
@@ -59,11 +80,11 @@ class cell_style:
         return cell_dict
 
 default_cell = cell_style(
-    fontSize=14,
+    fontSize=10,
 )
 
 default_header = cell_style(
-    fontSize=15,
+    fontSize=10,
     fontWeight="bold",
 )
 
@@ -107,6 +128,21 @@ class col_base:
 
     columnGroupShow: Union[bool, str, None] = None
     children: Optional[List['col_base']] = None
+
+    #ROW GROUPING:
+    rowGroup: bool = False              # Agrupa filas por esta columna (ej: proyecto → solped)
+    hide: bool = False                  # Oculta la columna (ya se ve en la columna de agrupación)
+    aggFunc: Optional[str] = None       # Función de agregación en filas grupo ("sum", "avg", etc.)
+    enableRowGroup: bool = True        # Permite al usuario arrastrarla al panel de agrupación
+    enableValue: bool = False           # Permite al usuario cambiar la aggregation desde el sidebar
+
+
+
+
+
+
+
+
     kwargs: Optional[Dict[str, Any]] = field(default_factory=dict)
     
 
@@ -158,6 +194,19 @@ class col_base:
             col_options['cellStyle'] = self.cellStyle
         else:
             col_options['cellStyle'] = default_cell.to_dict()
+
+        
+        #ROW GROUPING:
+        if self.rowGroup:
+            col_options['rowGroup'] = True
+        if self.hide:
+            col_options['hide'] = True
+        if self.aggFunc:
+            col_options['aggFunc'] = self.aggFunc
+        if self.enableRowGroup:
+            col_options['enableRowGroup'] = True
+        if self.enableValue:
+            col_options['enableValue'] = True
         
         for k, v in self.kwargs.items():
             col_options[k] = v
@@ -219,7 +268,9 @@ class col_date(col_base):
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
 
-            return `${year}-${month}-${day}`;
+            //return `${year}-${month}-${day}`;
+            //Mas visual asi:
+            return `${day}/${month}/${year}`;
         }
         """)
 
@@ -621,7 +672,6 @@ class col_bar(col_base):
             }}
             """)
         self.kwargs['cellRenderer'] = _BAR_RENDERER
-
 @dataclass
 class col_status(col_base):
     '''
@@ -637,9 +687,16 @@ class col_status(col_base):
         )
         print("Ejecutando función antigua")
 
-
         if self.filter:
             self.filter = 'agTextColumnFilter'
+
+        # ★ Forzar cellStyle limpio para que el renderer no se comprima
+        # if self.cellStyle is None:
+        #     self.cellStyle = {
+        #         "display": "flex",
+        #         "alignItems": "center",
+        #         "padding": "0",
+        #     }
 
         status_map = self.status_map or {
             "OK": "#2ecc71",
@@ -650,57 +707,73 @@ class col_status(col_base):
         status_map_js = json.dumps(status_map)
 
         _STATUS_RENDERER = JsCode(f"""
-                class StatusRenderer {{
-                    init(params) {{
-                        const colorMap = {status_map_js};
-                        const val = params.value || "";
-                        const rawColor = colorMap[val] || "#999999";
-                        let color = rawColor;
-                        if (/^#[0-9a-fA-F]{{3}}$/.test(color)) {{
-                            color = '#' + color[1]+color[1] + color[2]+color[2] + color[3]+color[3];
-                        }}
-                        const uid = 'st_' + Math.random().toString(36).substr(2, 9);
-
-                        this.eGui = document.createElement('span');
-                        this.eGui.style.cssText =
-                            'display:inline-flex;align-items:center;gap:14px;' +
-                            'background:' + color + '22;color:' + color + ';' +
-                            'padding:4px 10px;border-radius:12px;font-weight:600;font-size:12px;';
-
-                        const txt = document.createElement('span');
-                        txt.textContent = val;
-
-                        const dotWrap = document.createElement('div');
-                        dotWrap.style.cssText = 'position:relative;width:8px;height:8px;flex-shrink:0;';
-
-                        const dot = document.createElement('div');
-                        dot.style.cssText =
-                            'width:8px;height:8px;border-radius:50%;background:' + color +
-                            ';position:absolute;top:0;left:0;';
-                        dotWrap.appendChild(dot);
-
-                        const ring = document.createElement('div');
-                        ring.style.cssText =
-                            'position:absolute;top:-3px;left:-3px;width:14px;height:14px;' +
-                            'border-radius:50%;border:1.5px solid ' + color + ';opacity:0;' +
-                            'animation:' + uid + '_pulse 2s ease-out infinite;';
-                        dotWrap.appendChild(ring);
-
-                        this.eGui.appendChild(txt);
-                        this.eGui.appendChild(dotWrap);
-
-                        const style = document.createElement('style');
-                        style.textContent =
-                            '@keyframes ' + uid + '_pulse {{' +
-                            '0%{{opacity:.6;transform:scale(.7)}}' +
-                            '100%{{opacity:0;transform:scale(2)}}}}';
-                        this.eGui.appendChild(style);
-                    }}
-                    getGui() {{ return this.eGui; }}
+        class StatusRenderer {{
+            init(params) {{
+                const colorMap = {status_map_js};
+                const val = params.value || "";
+                const rawColor = colorMap[val] || "#999999";
+                let color = rawColor;
+                if (/^#[0-9a-fA-F]{{3}}$/.test(color)) {{
+                    color = '#' + color[1]+color[1] + color[2]+color[2] + color[3]+color[3];
                 }}
-                """)
+                const uid = 'st_' + Math.random().toString(36).substr(2, 9);
 
-        self.kwargs.update({'cellRenderer': _STATUS_RENDERER})
+                // ★ Adaptar al rowHeight
+                const rh       = (params.node && params.node.rowHeight) || 35;
+                const fontSize  = Math.max(9, Math.min(12, Math.floor(rh * 0.32)));
+                const padV      = Math.max(1, Math.floor(rh * 0.06));
+                const padH      = Math.max(4, Math.floor(rh * 0.2));
+                const gapSize   = Math.max(4, Math.floor(rh * 0.18));
+                const dotSize   = Math.max(4, Math.min(8, Math.floor(rh * 0.18)));
+                const ringSize  = dotSize + 6;
+                const ringOff   = Math.floor((ringSize - dotSize) / 2);
+
+                this.eGui = document.createElement('span');
+                this.eGui.style.cssText =
+                    'display:inline-flex;align-items:center;' +
+                    'gap:' + gapSize + 'px;' +
+                    'background:' + color + '22;color:' + color + ';' +
+                    'padding:' + padV + 'px ' + padH + 'px;' +
+                    'border-radius:12px;font-weight:600;' +
+                    'font-size:' + fontSize + 'px;' +
+                    'box-sizing:border-box;max-height:' + (rh - 6) + 'px;';
+
+                const txt = document.createElement('span');
+                txt.textContent = val;
+
+                const dotWrap = document.createElement('div');
+                dotWrap.style.cssText =
+                    'position:relative;width:' + dotSize + 'px;height:' + dotSize + 'px;flex-shrink:0;';
+
+                const dot = document.createElement('div');
+                dot.style.cssText =
+                    'width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:' + color +
+                    ';position:absolute;top:0;left:0;';
+                dotWrap.appendChild(dot);
+
+                const ring = document.createElement('div');
+                ring.style.cssText =
+                    'position:absolute;top:-' + ringOff + 'px;left:-' + ringOff + 'px;' +
+                    'width:' + ringSize + 'px;height:' + ringSize + 'px;' +
+                    'border-radius:50%;border:1.5px solid ' + color + ';opacity:0;' +
+                    'animation:' + uid + '_pulse 2s ease-out infinite;';
+                dotWrap.appendChild(ring);
+
+                this.eGui.appendChild(txt);
+                this.eGui.appendChild(dotWrap);
+
+                const style = document.createElement('style');
+                style.textContent =
+                    '@keyframes ' + uid + '_pulse {{' +
+                    '0%{{opacity:.6;transform:scale(.7)}}' +
+                    '100%{{opacity:0;transform:scale(2)}}}}';
+                this.eGui.appendChild(style);
+            }}
+            getGui() {{ return this.eGui; }}
+        }}
+        """)
+
+        self.kwargs['cellRenderer']= _STATUS_RENDERER
 
 @dataclass
 class col_progress(col_base):
@@ -804,8 +877,8 @@ class col_icon(col_base):
     filled: bool = False
 
     def __post_init__(self):
-        if self.filter:
-            self.filter = 'agTextColumnFilter'
+        # if self.filter:
+        #     self.filter = 'agTextColumnFilter'
 
         # Fallback
         status_map = self.status_map or {
@@ -834,85 +907,76 @@ class col_icon(col_base):
         filled_flag = self.filled
 
         _ICON_RENDERER = JsCode(f"""
-        class IconStatusRenderer {{
-            init(params) {{
-                const configMap = {config_js_str};
-                const iconSize = {icon_size};
-                const filled = {'true' if filled_flag else 'false'};
+            class IconStatusRenderer {{
+                init(params) {{
+                    const configMap = {config_js_str};
+                    const filled = {'true' if filled_flag else 'false'};
 
-                // --- Inyectar fuente Material Symbols una sola vez ---
-                if (!document.getElementById('_mat_sym_link')) {{
-                    const link = document.createElement('link');
-                    link.id = '_mat_sym_link';
-                    link.rel = 'stylesheet';
-                    link.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200';
-                    document.head.appendChild(link);
+                    if (!document.getElementById('_mat_sym_link')) {{
+                        const link = document.createElement('link');
+                        link.id = '_mat_sym_link';
+                        link.rel = 'stylesheet';
+                        link.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200';
+                        document.head.appendChild(link);
+                    }}
+
+                    const val = (params.value || "").trim();
+                    const uid = 'is_' + Math.random().toString(36).substr(2, 9);
+                    const cfg = configMap[val] || {{ color: "#95a5a6", label: val, icon: "circle" }};
+                    const color = cfg.color;
+                    const materialIcon = cfg.icon;
+
+                    // ★ Adaptar al rowHeight
+                    const rh = (params.node && params.node.rowHeight) || 35;
+                    const wrapSize = Math.max(18, Math.floor(rh * 0.72));
+                    const dynIconSize = Math.max(12, wrapSize - 10);
+                    const codeFontSize = Math.max(9, Math.min(12.5, rh * 0.34));
+                    const descFontSize = Math.max(8, Math.min(10.5, rh * 0.28));
+                    const gapSize = Math.max(2, Math.floor(rh * 0.08));
+
+                    this.eGui = document.createElement('div');
+                    this.eGui.style.cssText = 'display:flex;align-items:center;gap:'+gapSize+'px;height:100%;';
+
+                    const iconWrap = document.createElement('div');
+                    iconWrap.style.cssText = 'width:'+wrapSize+'px;height:'+wrapSize+'px;border-radius:50%;'
+                        + 'background:' + color + '15;'
+                        + 'display:flex;align-items:center;justify-content:center;flex-shrink:0;'
+                        + 'opacity:0;animation:' + uid + '_iconPop 0.4s 0.08s cubic-bezier(0.34,1.56,0.64,1) forwards;';
+
+                    const iconEl = document.createElement('span');
+                    iconEl.className = 'material-symbols-outlined';
+                    iconEl.textContent = materialIcon;
+                    iconEl.style.cssText = 'font-size:' + dynIconSize + 'px;color:' + color + ';'
+                        + 'user-select:none;line-height:1;'
+                        + (filled ? 'font-variation-settings:"FILL" 1;' : '');
+                    iconWrap.appendChild(iconEl);
+
+                    const textBlock = document.createElement('div');
+                    textBlock.style.cssText = 'display:flex;flex-direction:column;gap:0px;min-width:0;'
+                        + 'opacity:0;animation:' + uid + '_textSlide 0.35s 0.18s ease-out forwards;';
+
+                    const codeLine = document.createElement('span');
+                    codeLine.style.cssText = 'font-size:'+codeFontSize+'px;font-weight:800;color:' + color + ';letter-spacing:0.3px;line-height:1.2;';
+                    codeLine.textContent = val;
+
+                    const descLine = document.createElement('span');
+                    descLine.style.cssText = 'font-size:'+descFontSize+'px;color:#888;font-weight:500;line-height:1.2;'
+                        + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+                    descLine.textContent = cfg.label;
+
+                    textBlock.appendChild(codeLine);
+                    textBlock.appendChild(descLine);
+                    this.eGui.appendChild(iconWrap);
+                    this.eGui.appendChild(textBlock);
+
+                    const style = document.createElement('style');
+                    style.textContent = '@keyframes ' + uid + '_iconPop{{from{{opacity:0;transform:scale(0) rotate(-45deg)}}to{{opacity:1;transform:scale(1) rotate(0deg)}}}}'
+                        + '@keyframes ' + uid + '_textSlide{{from{{opacity:0;transform:translateX(-8px)}}to{{opacity:1;transform:translateX(0)}}}}';
+                    this.eGui.appendChild(style);
                 }}
-
-                const val = (params.value || "").trim();
-                const uid = 'is_' + Math.random().toString(36).substr(2, 9);
-
-                const cfg = configMap[val] || {{
-                    color: "#95a5a6",
-                    label: val,
-                    icon: "circle"
-                }};
-                const color = cfg.color;
-                const materialIcon = cfg.icon;
-
-                this.eGui = document.createElement('div');
-                this.eGui.style.cssText = 'display:flex;align-items:center;gap:8px;';
-
-                // --- Icon circle ---
-                const iconWrap = document.createElement('div');
-                iconWrap.style.cssText =
-                    'width:32px;height:32px;border-radius:50%;' +
-                    'background:' + color + '15;' +
-                    'display:flex;align-items:center;justify-content:center;flex-shrink:0;' +
-                    'opacity:0;animation:' + uid + '_iconPop 0.4s 0.08s cubic-bezier(0.34,1.56,0.64,1) forwards;';
-
-                const iconEl = document.createElement('span');
-                iconEl.className = 'material-symbols-outlined';
-                iconEl.textContent = materialIcon;
-                iconEl.style.cssText =
-                    'font-size:' + iconSize + 'px;color:' + color + ';' +
-                    'user-select:none;line-height:1;' +
-                    (filled ? 'font-variation-settings:"FILL" 1;' : '');
-                iconWrap.appendChild(iconEl);
-
-                // --- Text block ---
-                const textBlock = document.createElement('div');
-                textBlock.style.cssText =
-                    'display:flex;flex-direction:column;gap:0px;min-width:0;' +
-                    'opacity:0;animation:' + uid + '_textSlide 0.35s 0.18s ease-out forwards;';
-
-                const codeLine = document.createElement('span');
-                codeLine.style.cssText =
-                    'font-size:12.5px;font-weight:800;color:' + color +
-                    ';letter-spacing:0.3px;line-height:1.2;';
-                codeLine.textContent = val;
-
-                const descLine = document.createElement('span');
-                descLine.style.cssText =
-                    'font-size:10.5px;color:#888;font-weight:500;line-height:1.2;' +
-                    'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-                descLine.textContent = cfg.label;
-
-                textBlock.appendChild(codeLine);
-                textBlock.appendChild(descLine);
-
-                this.eGui.appendChild(iconWrap);
-                this.eGui.appendChild(textBlock);
-
-                const style = document.createElement('style');
-                style.textContent =
-                    '@keyframes ' + uid + '_iconPop{{from{{opacity:0;transform:scale(0) rotate(-45deg)}}to{{opacity:1;transform:scale(1) rotate(0deg)}}}}' +
-                    '@keyframes ' + uid + '_textSlide{{from{{opacity:0;transform:translateX(-8px)}}to{{opacity:1;transform:translateX(0)}}}}';
-                this.eGui.appendChild(style);
+                getGui() {{ return this.eGui; }}
             }}
-            getGui() {{ return this.eGui; }}
-        }}
-        """)
+            """)
 
         self.kwargs.update({'cellRenderer': _ICON_RENDERER})
 
@@ -934,10 +998,19 @@ def easy_table(
         select_checkbox: bool = True,
         fit_columns_on_grid_load: bool = False,
         height: int = None,
-        row_height: int = 40,
+        row_height: int = 30,
         floatingFilter: bool = False,
         statusbar: bool = False,
         sidebar: bool = False,
+
+        #ROW GROUPING:
+        row_grouping: bool = False,
+
+        #TREE DATA:
+        tree_data: bool = False,
+        tree_level_col: str = None,
+
+        
     ): #  -> Any | str | 'pd.DataFrame' | None
     '''
     Render a dataframe with AgGrid and custom options
@@ -984,6 +1057,79 @@ def easy_table(
         #     "autoHeight": False, # grid_options['defaultColDef']['autoHeight'] = True
         # },
     )
+
+    # ---------------------------------------------------------------
+    #  ROW GROUPING 
+    #----------------------------------------------------------------
+    #De momento HARD-CODED:
+    #1.Cuando se ve el menu superior para agrupar:
+    row_group_panel = "always"  #["never", "always", "onlyWhenGrouping"]
+
+    #2.Hasta qué nivel aparece expandido por defecto:
+        #  0 = todo colapsado; 
+        #  1 = Se abre el primer nivel
+        #  -1 = Todo expandido
+    group_default_expanded: int = -1
+
+    #3.Nombre de la columna agrupacion:
+    auto_group_name = "Agrupacion"
+
+    #4.Ancho de la columna agrupacion:
+    auto_group_width = 320
+
+    if row_grouping:
+        gb.configure_grid_options(
+            animateRows=True,
+            groupDefaultExpanded=group_default_expanded,
+            rowGroupPanelShow=row_group_panel,
+            showOpenedGroup=True,
+            suppressAggFuncInHeader=False,
+            autoGroupColumnDef={
+                "headerName": auto_group_name,
+                "width": auto_group_width,
+                "suppressSizeToFit": True, #PARA QUE NO SE AJUSTE
+                # "pinned": "left", #ESTE PINNED NO SE PONE, porque al ponerlo la columna de agrupacion se pone mas a la izda que el checkbox ->FEO
+                "cellRendererParams": {"suppressCount": False},
+                "cellStyle": cell_style.to_dict(),
+            },
+        )
+    # ---------------------------------------------------------------
+    #  ROW GROUPING 
+    #----------------------------------------------------------------
+
+
+    # ---------------------------------------------------------------
+    #  TREE DATA
+    #----------------------------------------------------------------
+    #Nombre y ancho de la columna agrupada (de momento HARD-CODED)
+    auto_tree_name = "Nivel"
+    auto_tree_width = 60
+
+
+    if tree_data:
+        if not tree_level_col:
+            raise ValueError("tree_data requires tree_level_col and tree_id_col")
+        df = build_hierarchy(df, level_col=tree_level_col)
+        
+        gb.configure_grid_options(
+            treeData=True,
+            animateRows=True,
+            getDataPath=JsCode("function(data) { return JSON.parse(data.hierarchy); }"),
+            groupDefaultExpanded=group_default_expanded,
+            autoGroupColumnDef={
+                "headerName": auto_tree_name,
+                "field": tree_level_col,
+                "width": auto_tree_width,
+                "suppressSizeToFit": True, #PARA QUE NO SE AJUSTE
+                # "pinned": "left", #ESTE PINNED NO SE PONE, porque al ponerlo la columna de agrupacion se pone mas a la izda que el checkbox ->FEO
+                "cellRendererParams": {"suppressCount": False},
+                "cellStyle": cell_style.to_dict(),
+            },
+        )
+
+    # ---------------------------------------------------------------
+    #  TREE DATA
+    #----------------------------------------------------------------
 
     grid_options = gb.build()
 
@@ -1083,4 +1229,5 @@ def easy_table(
         theme='streamlit'
     )
 
-    return response.selected_data
+    
+    return response.selected_rows
