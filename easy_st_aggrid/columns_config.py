@@ -40,11 +40,13 @@ class cell_style:
     fontFamily : str
     fontWeight : "bold" or None
     color: str ("#000000")
+    background_color : int
     '''
     fontSize: Optional[int] = 15
     fontFamily: Optional[str] = "Neo Sans, sans-serif"
     fontWeight: Optional[str] = None
     color: Optional[str] = None
+    background_color: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         cell_dict = dict()
@@ -56,6 +58,8 @@ class cell_style:
         cell_dict['display'] = "flex"
         cell_dict['paddingLeft'] = "20px"
         cell_dict['alignItems'] = "center" # "center" | "top" | "bottom"
+        if self.background_color:
+            cell_dict['background-color'] = cell_dict.pop('background_color')
         return cell_dict
 
 default_cell = cell_style(
@@ -63,7 +67,7 @@ default_cell = cell_style(
 )
 
 default_header = cell_style(
-    fontSize=15,
+    fontSize=14,
     fontWeight="bold",
 )
 
@@ -151,11 +155,11 @@ class col_base:
             col_options['children'] = [child.data() for child in self.children]
 
         if self.headerStyle != None:
-            col_options['headerStyle'] = self.headerStyle
+            col_options['headerStyle'] = self.headerStyle.to_dict()
         else:
             col_options['headerStyle'] = default_header.to_dict()
         if self.cellStyle != None:
-            col_options['cellStyle'] = self.cellStyle
+            col_options['cellStyle'] = self.cellStyle.to_dict()
         else:
             col_options['cellStyle'] = default_cell.to_dict()
         
@@ -938,6 +942,7 @@ def easy_table(
         floatingFilter: bool = False,
         statusbar: bool = False,
         sidebar: bool = False,
+        enterprise: bool = False,
     ): #  -> Any | str | 'pd.DataFrame' | None
     '''
     Render a dataframe with AgGrid and custom options
@@ -1071,16 +1076,17 @@ def easy_table(
 
     ## TABLE
     response = AgGrid(
-        df,
+        data=df,
         gridOptions=grid_options,
-        enable_enterprise_modules=True,  # necesario para aggregation
-        allow_unsafe_jscode=True,
         height=height,  # opcional, ignora alto fijo
+        allow_unsafe_jscode=True,
+        enable_enterprise_modules=enterprise,  # necesario para aggregation
+        theme='streamlit',
+        
         fit_columns_on_grid_load = fit_columns_on_grid_load,
         # columns_auto_size_mode = ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
         columns_auto_size_mode = "FIT_ALL_COLUMNS_TO_VIEW",
         # domLayout="autoHeight",
-        theme='streamlit'
     )
 
     return response.selected_data
