@@ -23,6 +23,7 @@ from dataclasses import dataclass, asdict, field
 from typing import Optional, Union, List, Tuple, Dict, Any, Literal, TYPE_CHECKING
 
 from st_aggrid import AgGrid, JsCode, GridOptionsBuilder, ColumnsAutoSizeMode
+from st_aggrid.shared import StAggridTheme
 # from icons import *
 
 import pandas as pd
@@ -31,14 +32,14 @@ import pandas as pd
 #     import pandas as pd
 
 
-def build_hierarchy(df: pd.DataFrame, level_col: str) -> pd.DataFrame:
+def build_hierarchy(df: pd.DataFrame, col_name: str) -> pd.DataFrame:
     df = df.copy()
     df = df.reset_index(drop=True)
     stack = []
     paths = []
 
     for idx, row in df.iterrows():
-        lvl = int(row[level_col]) + 1  # ← normalizar: 0→1, 1→2, 2→3...
+        lvl = int(row[col_name]) + 1  # ← normalizar: 0→1, 1→2, 2→3...
 
         while len(stack) >= lvl:
             stack.pop()
@@ -221,6 +222,9 @@ class col_text(col_base):
     def __post_init__(self):
         if self.filter:
             self.filter = 'agTextColumnFilter'
+        # Exportar siempre como texto en Excel (evita notación científica)
+        self.kwargs = dict(self.kwargs) if self.kwargs else {}
+        self.kwargs.setdefault("cellClass", "stringType")
 
 @dataclass
 class col_date(col_base):
@@ -268,9 +272,9 @@ class col_date(col_base):
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
 
-            //return `${year}-${month}-${day}`;
+            return `${year}-${month}-${day}`;
             //Mas visual asi:
-            return `${day}/${month}/${year}`;
+            //return `${day}/${month}/${year}`;
         }
         """)
 
@@ -687,17 +691,10 @@ class col_status(col_base):
         )
         print("Ejecutando función antigua")
 
-        if self.filter:
-            self.filter = 'agTextColumnFilter'
+        # if self.filter:
+        #     self.filter = 'agTextColumnFilter'
 
-        # ★ Forzar cellStyle limpio para que el renderer no se comprima
-        # if self.cellStyle is None:
-        #     self.cellStyle = {
-        #         "display": "flex",
-        #         "alignItems": "center",
-        #         "padding": "0",
-        #     }
-
+ 
         status_map = self.status_map or {
             "OK": "#2ecc71",
             "En riesgo": "#f39c12",
@@ -778,7 +775,7 @@ class col_status(col_base):
 @dataclass
 class col_progress(col_base):
     '''
-    Progress Column
+    Progress Column - responsive to rowHeight
     '''
     def __post_init__(self):
         if self.filter:
@@ -791,11 +788,14 @@ class col_progress(col_base):
                     if (isNaN(val)) { this.eGui = document.createElement('span'); this.eGui.textContent = params.value || ''; return; }
                     val = Math.max(0, Math.min(100, val));
 
-                    const size = 40;
-                    const stroke = 4;
+                    // ★ Adaptar al rowHeight
+                    const rh = (params.node && params.node.rowHeight) || 35;
+                    const size = Math.max(16, Math.min(40, rh - 6));
+                    const stroke = Math.max(2, (size * 0.1) | 0);
                     const radius = (size - stroke) / 2;
                     const circ = 2 * Math.PI * radius;
                     const offset = circ * (1 - val / 100);
+                    const txtSize = Math.max(7, (size * 0.275) | 0);
 
                     let color;
                     if (val >= 80) color = '#2ecc71';
@@ -807,6 +807,7 @@ class col_progress(col_base):
                     this.eGui.style.display = 'flex';
                     this.eGui.style.alignItems = 'center';
                     this.eGui.style.justifyContent = 'center';
+                    this.eGui.style.height = '100%';
 
                     this.eGui.innerHTML = `
                         <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
@@ -824,7 +825,7 @@ class col_progress(col_base):
                                     keySplines="0.4 0 0.2 1"/>
                             </circle>
                             <text x="50%" y="53%" dominant-baseline="middle" text-anchor="middle"
-                                font-size="11" font-weight="800" fill="${color}"
+                                font-size="${txtSize}" font-weight="800" fill="${color}"
                                 font-family="Segoe UI, sans-serif"
                                 style="opacity:0">
                                 ${Math.round(val)}%
@@ -1002,6 +1003,9 @@ def easy_table(
         floatingFilter: bool = False,
         statusbar: bool = False,
         sidebar: bool = False,
+        enterprise: bool = False,
+        #Theme
+        dark_theme: bool = False,
 
         #ROW GROUPING:
         row_grouping: bool = False,
@@ -1018,6 +1022,27 @@ def easy_table(
 
     ## DATAFRAME
     df = dataframe.copy()
+
+    # ---------------------------------------------------------------
+    #  AUTO-CALCULAR maxAbs PARA col_bar (búsqueda recursiva)
+    # ---------------------------------------------------------------
+    def _find_col_bars(cols):
+        """Busca col_bar en toda la jerarquía de columnas."""
+        for c in cols:
+            if isinstance(c, col_bar):
+                yield c
+            if hasattr(c, 'children') and c.children:
+                yield from _find_col_bars(c.children)
+
+    if columns_list:
+        for col in _find_col_bars(columns_list):
+            if col.max_abs is None and col.id in df.columns:
+                series = pd.to_numeric(df[col.id], errors='coerce')
+                max_val = series.abs().max()
+                col.max_abs = float(max_val) if pd.notna(max_val) and max_val > 0 else 1
+                col._build_renderer()
+    # ---------------------------------------------------------------
+
     gb = GridOptionsBuilder.from_dataframe(df)
 
     # gb.configure_side_bar(
@@ -1052,6 +1077,14 @@ def easy_table(
         supressSizeToFit=True,
         suppressColumnVirtualisation=True,
         rowHeight = row_height, # Definir altura fija de filas
+
+        #PARA EXPORTAR A EXCEL:
+        excelStyles=[
+            {
+                "id": "stringType",
+                "dataType": "String",
+            }
+        ],
         # defaultColDef={
         #     "wrapText": False, # grid_options['defaultColDef']['wrapText'] = True
         #     "autoHeight": False, # grid_options['defaultColDef']['autoHeight'] = True
@@ -1109,7 +1142,7 @@ def easy_table(
     if tree_data:
         if not tree_level_col:
             raise ValueError("tree_data requires tree_level_col and tree_id_col")
-        df = build_hierarchy(df, level_col=tree_level_col)
+        df = build_hierarchy(df, col_name=tree_level_col)
         
         gb.configure_grid_options(
             treeData=True,
@@ -1122,7 +1155,7 @@ def easy_table(
                 "width": auto_tree_width,
                 "suppressSizeToFit": True, #PARA QUE NO SE AJUSTE
                 # "pinned": "left", #ESTE PINNED NO SE PONE, porque al ponerlo la columna de agrupacion se pone mas a la izda que el checkbox ->FEO
-                "cellRendererParams": {"suppressCount": False},
+                "cellRendererParams": {"suppressCount": True},
                 "cellStyle": cell_style.to_dict(),
             },
         )
@@ -1214,19 +1247,46 @@ def easy_table(
             # "defaultToolPanel": None
         }
 
+    if dark_theme:
+        _theme = StAggridTheme(base='balham').withParams(
+            backgroundColor="#3D3D3D",
+            foregroundColor="#e8e8e8",
+            headerBackgroundColor="#1E1E1E",
+            headerTextColor="#e8e8e8",
+            rowBorder={"color": "#2a2a2a"},
+            oddRowBackgroundColor="#1A1A1A",
+            borderColor="#2a2a2a",
+            selectedRowBackgroundColor="rgba(255,191,0,0.25)",
+            rowHoverColor="rgba(255,191,0,0.10)",
+            accentColor="#FFBF00",
+            rangeSelectionBorderColor="#FFBF00",
+        )
+    else:
+        _theme = StAggridTheme(base='balham').withParams(
+            backgroundColor="#FFFFFF",
+            foregroundColor="#000000",
+            headerBackgroundColor="#f8f8f8",
 
+            oddRowBackgroundColor="#fafafa",
+            selectedRowBackgroundColor="rgba(0,68,103,0.20)",
+            rowHoverColor="rgba(0,68,103,0.08)",
+            accentColor="#004467",
+            rangeSelectionBorderColor="#004467",
+        )
+    
     ## TABLE
     response = AgGrid(
         df,
         gridOptions=grid_options,
-        enable_enterprise_modules=True,  # necesario para aggregation
+        enable_enterprise_modules=enterprise,  # necesario para aggregation
         allow_unsafe_jscode=True,
         height=height,  # opcional, ignora alto fijo
         fit_columns_on_grid_load = fit_columns_on_grid_load,
         # columns_auto_size_mode = ColumnsAutoSizeMode.FIT_ALL_COLUMNS_TO_VIEW,
         columns_auto_size_mode = "FIT_ALL_COLUMNS_TO_VIEW",
         # domLayout="autoHeight",
-        theme='streamlit'
+        # theme='dark' if dark_theme else 'light',
+        theme=_theme,
     )
 
     
