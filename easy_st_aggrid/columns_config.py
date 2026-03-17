@@ -84,7 +84,7 @@ class cell_style:
         return cell_dict
 
 default_cell = cell_style(
-    fontSize=10,
+    fontSize=14,
 )
 
 default_header = cell_style(
@@ -135,21 +135,14 @@ class col_base:
 
     #ROW GROUPING:
     rowGroup: bool = False              # Agrupa filas por esta columna (ej: proyecto → solped)
-    hide: bool = False                  # Oculta la columna (ya se ve en la columna de agrupación)
-    aggFunc: Optional[str] = None       # Función de agregación en filas grupo ("sum", "avg", etc.)
-    enableRowGroup: bool = True        # Permite al usuario arrastrarla al panel de agrupación
-    enableValue: bool = False           # Permite al usuario cambiar la aggregation desde el sidebar
+    enableRowGroup: bool = False        # Permite al usuario arrastrarla al panel de agrupación
 
-
-
-
-
-
-
+    # hide: bool = False                  # Oculta la columna (ya se ve en la columna de agrupación)
+    # aggFunc: Optional[str] = None       # Función de agregación en filas grupo ("sum", "avg", etc.)
+    # enableValue: bool = False           # Permite al usuario cambiar la aggregation desde el sidebar
 
     kwargs: Optional[Dict[str, Any]] = field(default_factory=dict)
     
-
     def data(self) -> Dict[str, Any]:
         '''
         Returns a dictionary key, value from defined objects
@@ -168,10 +161,6 @@ class col_base:
             col_options['filter'] = self.filter
 
         if self.width != None:
-            # col_options['width'] = self.width
-            # col_options["suppressSizeToFit"] = True # evita autosize wrapper
-            # col_options.pop("flex", None) # evita flex accidental
-            # col_options["flex"] = 0
             col_options.update({
                 "width": self.width,
                 "flex": 0,
@@ -187,30 +176,30 @@ class col_base:
         if self.columnGroupShow:
             col_options['columnGroupShow'] = self.columnGroupShow
         if self.children:
-            # col_options['children'] = self.children
             col_options['children'] = [child.data() for child in self.children]
 
-        if self.headerStyle != None:
+        col_options['headerStyle'] = default_header.to_dict()
+        if self.headerStyle:
             col_options['headerStyle'] = self.headerStyle.to_dict()
-        else:
-            col_options['headerStyle'] = default_header.to_dict()
+
+        col_options['cellStyle'] = default_cell.to_dict()
         if self.cellStyle != None:
             col_options['cellStyle'] = self.cellStyle.to_dict()
-        else:
-            col_options['cellStyle'] = default_cell.to_dict()
+            
+        col_options['cellClass']="leftAlign"
 
         
         #ROW GROUPING:
         if self.rowGroup:
             col_options['rowGroup'] = True
-        if self.hide:
-            col_options['hide'] = True
-        if self.aggFunc:
-            col_options['aggFunc'] = self.aggFunc
+        # if self.hide:
+        #     col_options['hide'] = True
+        # if self.aggFunc:
+        #     col_options['aggFunc'] = self.aggFunc
         if self.enableRowGroup:
             col_options['enableRowGroup'] = True
-        if self.enableValue:
-            col_options['enableValue'] = True
+        # if self.enableValue:
+        #     col_options['enableValue'] = True
         
         for k, v in self.kwargs.items():
             col_options[k] = v
@@ -238,50 +227,132 @@ class col_date(col_base):
             # self.filter = "agDateColumnFilter", "filterParams": {"customFormatString": "yyyy-MM-dd", "browserDatePicker": True, "comparator": comparator}, 
             # self.filter = 'agTextColumnFilter'
         
-        # value_formatter_js = JsCode("""
-        #     function(params) {
-        #         if (params.value) {
-        #             const date = new Date(params.value);
-        #             const year = date.getFullYear();
-        #             const month = ('0' + (date.getMonth() + 1)).slice(-2);
-        #             const day = ('0' + date.getDate()).slice(-2);
-        #             return year + '-' + month + '-' + day;
-        #         } else {
-        #             return '';
-        #         }
-        #     }
-        # """)
-
         value_formatter_js = JsCode("""
-        function (params) {
+        function(params) {
             const v = params.value;
 
-            // Null, undefined, empty string
             if (v === null || v === undefined || v === '') {
                 return '';
             }
 
-            const date = new Date(v);
+            let date;
 
-            // Fecha inválida
-            if (isNaN(date.getTime())) {
-                return '';
+            try {
+                // Caso 1: valor ya es Date
+                if (v instanceof Date) {
+                    date = v;
+                }
+                // Caso 2: valor tipo número (Unix timestamp en segundos o milisegundos)
+                else if (typeof v === 'number') {
+                    date = (v < 1e12) ? new Date(v * 1000) : new Date(v);
+                }
+                // Caso 3: valor tipo string
+                else if (typeof v === 'string') {
+                    // Reemplaza espacio por 'T' para formato ISO
+                    const iso_str = v.replace(' ', 'T');
+                    date = new Date(iso_str);
+                }
+                // Otro tipo: error
+                else {
+                    return 'ERROR: tipo desconocido';
+                }
+
+                // Validar fecha
+                if (isNaN(date.getTime())) {
+                    return 'ERROR: valor inválido';
+                }
+
+                const year = date.getFullYear();
+                const month = ('0' + (date.getMonth() + 1)).slice(-2);
+                const day = ('0' + date.getDate()).slice(-2);
+
+                return `${year}-${month}-${day}`;
+            } catch (err) {
+                return 'ERROR: ' + err.message;
             }
-
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-
-            //return `${year}-${month}-${day}`;
-            //Mas visual asi:
-            return `${day}/${month}/${year}`;
         }
         """)
 
         self.kwargs.update({
-            "filterParams": {"customFormatString": "yyyy-MM-dd"},
-            "type": ["agTextColumnFilter", "customDateTimeFormat"],
-            "valueFormatter": value_formatter_js,
+            
+            "filter": "agSetColumnFilter",
+            "filterParams": {
+                "treeData": True, 
+                "customFormatString": "yyyy-MM-dd"
+            },
+            # "type": ["agTextColumnFilter", "customDateTimeFormat"],
+
+            ## CALENDARIO
+            # "filter": "agDateColumnFilter",
+            # "filterParams": {
+            #     # custom comparator: solo compara YYYY-MM-DD
+            #     "comparator": JsCode("""
+            #         function(filterLocalDateAtMidnight, cellValue) {
+            #             if (cellValue == null || cellValue === '') return 0;
+
+            #             let cellDate;
+
+            #             // si ya es Date
+            #             if (cellValue instanceof Date) {
+            #                 cellDate = cellValue;
+            #             } else {
+            #                 // convierte string a Date, reemplaza espacio por 'T' para ISO
+            #                 cellDate = new Date(cellValue.replace(' ', 'T'));
+            #             }
+
+            #             // Extraer solo año-mes-día
+            #             const cellDateOnly = new Date(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
+
+            #             if (cellDateOnly < filterLocalDateAtMidnight) return -1;
+            #             else if (cellDateOnly > filterLocalDateAtMidnight) return 1;
+            #             else return 0;
+            #         }
+            #     """)
+            # },
+
+            # "valueFormatter": value_formatter_js,
+        })
+
+    def build_date_tree(df_col):
+        """
+        Devuelve lista de dicts para tree filter: año->mes->día
+        """
+        from collections import defaultdict
+        tree = defaultdict(lambda: defaultdict(list))
+
+        for v in df_col.dropna().unique():
+            # parsear string a fecha
+            import datetime
+            try:
+                d = pd.to_datetime(v)
+                tree[d.year][d.month].append(d.day)
+            except Exception:
+                continue
+
+        result = []
+        for year, months in tree.items():
+            months_list = []
+            for month, days in months.items():
+                days_list = [{"key": f"{day:02d}"} for day in sorted(set(days))]
+                months_list.append({"key": f"{month:02d}", "children": days_list})
+            result.append({"key": str(year), "children": months_list})
+        return result
+
+@dataclass
+class col_date_new(col_base):
+    def __post_init__(self):
+
+        self.kwargs.update({
+            "filter": "agSetColumnFilter",
+            # "filter": "agDateColumnFilter",
+            "filterParams": {
+                "customFormatString": "yyyy-MM-dd",
+                "browserDatePicker": True, 
+                # "comparator": comparator
+                "treeData": True,
+            #     # "values": tree_values
+            },
+            # "valueFormatter": value_formatter_js,
         })
 
 @dataclass
@@ -302,6 +373,7 @@ class col_checkbox(col_base):
             "sortable": True,
             "resizable": False,
         })
+
 
 
 ## FIELDS / UNDER TEST
@@ -676,6 +748,7 @@ class col_bar(col_base):
             }}
             """)
         self.kwargs['cellRenderer'] = _BAR_RENDERER
+
 @dataclass
 class col_status(col_base):
     '''
@@ -985,6 +1058,7 @@ class col_icon(col_base):
         self.kwargs.update({'cellRenderer': _ICON_RENDERER})
 
 
+
 ## TABLE
 
 def _columns_config(columns_list: List[col_base]) -> List[Dict]:
@@ -994,28 +1068,57 @@ def _columns_config(columns_list: List[col_base]) -> List[Dict]:
     # Recibe una lista de objetos col_base y devuelve lista de dicts
     return [col.data() for col in columns_list]
 
+def _extract_fields(column_defs, exclude_prefix="__"):
+    """
+    Recorre recursivamente columnDefs (con cualquier nivel de children)
+    y devuelve todos los field exportables respetando el orden visual.
+    """
+
+    fields = []
+
+    for col in column_defs:
+
+        # Caso 1: es un grupo
+        if isinstance(col, dict) and "children" in col:
+            fields.extend(
+                _extract_fields(col["children"], exclude_prefix)
+            )
+
+        # Caso 2: es columna normal
+        else:
+            field = col.get("field")
+
+            if (
+                field
+                and not field.startswith(exclude_prefix)
+            ):
+                fields.append(field)
+
+    return fields
+
 def easy_table(
         dataframe: 'pd.DataFrame', 
         columns_list: List[col_base] = None, 
         cell_style: cell_style = default_cell, 
         # getRowStyle: str = None,
         select_checkbox: bool = True,
-        fit_columns_on_grid_load: bool = False,
+        
         height: int = None,
-        row_height: int = 30,
+        
+        fit_columns_on_grid_load: bool = True,
+        suppressMovableColumns: bool = True,
         floatingFilter: bool = False,
         statusbar: bool = False,
         sidebar: bool = False,
-        enterprise: bool = False,
-
-        #ROW GROUPING:
+        
+        row_height: int = 30,
         row_grouping: bool = False,
 
         #TREE DATA:
-        tree_data: bool = False,
-        tree_level_col: str = None,
+        # tree_data: bool = False,
+        # tree_level_col: str = None,
 
-        
+        enterprise: bool = False,
     ): #  -> Any | str | 'pd.DataFrame' | None
     '''
     Render a dataframe with AgGrid and custom options
@@ -1036,114 +1139,57 @@ def easy_table(
         resizable=True,
         editable=False,
         floatingFilter=floatingFilter,
-        # floatingFilter=False,
     )
     
     gb.configure_selection(
-        selection_mode="single",
-        # selection_mode="multiple",
-        use_checkbox=True
+        selection_mode="single", # single / multiple
+        # use_checkbox=True,
+        # header_checkbox=False
     )
 
     # DEFAULT CONFIG
-    gb.configure_grid_options( # Aqui los defaults
-        # statusBar=statusBar_enterprise,
-        rowSelection="single",          # IMPORTANTE
-        # rowSelection="multiple",          # IMPORTANTE
-        enableRangeSelection=True,        # Para copiar rango
-        enableCellTextSelection=False,    # <- CLAVE en Mac
+    gb.configure_grid_options(
+        rowSelection="single",          # single / multiple
         suppressRowClickSelection=True,    # evita conflicto foco
-        suppressMovableColumns=True, # Bloquear reordenar columnas
+        enableRangeSelection=True,        # Para copiar rango
+        enableCellTextSelection=False,    # <- CLAVE en MacOS
+        suppressMovableColumns = suppressMovableColumns, # Bloquear reordenar columnas
         supressSizeToFit=True,
         suppressColumnVirtualisation=True,
-        rowHeight = row_height, # Definir altura fija de filas
+        rowHeight = row_height,
         # defaultColDef={
         #     "wrapText": False, # grid_options['defaultColDef']['wrapText'] = True
         #     "autoHeight": False, # grid_options['defaultColDef']['autoHeight'] = True
         # },
+        defaultExcelExportParams={
+            "allColumns": False
+        }
     )
-
-    # ---------------------------------------------------------------
-    #  ROW GROUPING 
-    #----------------------------------------------------------------
-    #De momento HARD-CODED:
-    #1.Cuando se ve el menu superior para agrupar:
-    row_group_panel = "always"  #["never", "always", "onlyWhenGrouping"]
-
-    #2.Hasta qué nivel aparece expandido por defecto:
-        #  0 = todo colapsado; 
-        #  1 = Se abre el primer nivel
-        #  -1 = Todo expandido
-    group_default_expanded: int = -1
-
-    #3.Nombre de la columna agrupacion:
-    auto_group_name = "Agrupacion"
-
-    #4.Ancho de la columna agrupacion:
-    auto_group_width = 320
-
-    if row_grouping:
-        gb.configure_grid_options(
-            animateRows=True,
-            groupDefaultExpanded=group_default_expanded,
-            rowGroupPanelShow=row_group_panel,
-            showOpenedGroup=True,
-            suppressAggFuncInHeader=False,
-            autoGroupColumnDef={
-                "headerName": auto_group_name,
-                "width": auto_group_width,
-                "suppressSizeToFit": True, #PARA QUE NO SE AJUSTE
-                # "pinned": "left", #ESTE PINNED NO SE PONE, porque al ponerlo la columna de agrupacion se pone mas a la izda que el checkbox ->FEO
-                "cellRendererParams": {"suppressCount": False},
-                "cellStyle": cell_style.to_dict(),
-            },
-        )
-    # ---------------------------------------------------------------
-    #  ROW GROUPING 
-    #----------------------------------------------------------------
-
-
-    # ---------------------------------------------------------------
-    #  TREE DATA
-    #----------------------------------------------------------------
-    #Nombre y ancho de la columna agrupada (de momento HARD-CODED)
-    auto_tree_name = "Nivel"
-    auto_tree_width = 60
-
-
-    if tree_data:
-        if not tree_level_col:
-            raise ValueError("tree_data requires tree_level_col and tree_id_col")
-        df = build_hierarchy(df, level_col=tree_level_col)
-        
-        gb.configure_grid_options(
-            treeData=True,
-            animateRows=True,
-            getDataPath=JsCode("function(data) { return JSON.parse(data.hierarchy); }"),
-            groupDefaultExpanded=group_default_expanded,
-            autoGroupColumnDef={
-                "headerName": auto_tree_name,
-                "field": tree_level_col,
-                "width": auto_tree_width,
-                "suppressSizeToFit": True, #PARA QUE NO SE AJUSTE
-                # "pinned": "left", #ESTE PINNED NO SE PONE, porque al ponerlo la columna de agrupacion se pone mas a la izda que el checkbox ->FEO
-                "cellRendererParams": {"suppressCount": False},
-                "cellStyle": cell_style.to_dict(),
-            },
-        )
-
-    # ---------------------------------------------------------------
-    #  TREE DATA
-    #----------------------------------------------------------------
 
     grid_options = gb.build()
 
+    # 🔥 Forzar selección correctamente en 1.1.9
+    grid_options["rowSelection"] = "single"
+
+    ## DEFAULT STYLE
     grid_options['defaultColDef']["cellStyle"] = cell_style.to_dict()
     # grid_options['getRowStyle'] = row_style_js  # gb.configure_grid_options(getRowStyle=row_style_js)
     
     # if getRowStyle:
     #     grid_options['getRowStyle'] = JsCode(getRowStyle)
 
+
+    # grid_options["columnDefs"][0].update({
+    #     "width": 100,
+    #     "maxWidth": 40,
+    #     "minWidth": 40,
+    #     "pinned": "left",
+    #     "sortable": False,
+    #     "resizable": False,
+    #     "filter": False
+    # })
+
+    ## STATUSBAR
     if statusbar:
         statusBar_enterprise = {
             "statusPanels": [
@@ -1164,31 +1210,7 @@ def easy_table(
         }
         grid_options['statusBar'] = statusBar_enterprise
 
-    if columns_list:
-        grid_options['columnDefs'] = _columns_config(columns_list=columns_list) #  or col.children
-
-        if select_checkbox:
-            grid_options['columnDefs'].insert(0, {
-                "headerName": "",
-                "field": "__selection__",
-                "checkboxSelection": True,
-                "headerCheckboxSelection": False,
-                "width": 40,
-                "maxWidth": 40,
-                "minWidth": 40,
-                "pinned": "left",
-                "sortable": False,
-                "resizable": False,
-                "filter": False,
-
-                "cellStyle": {
-                    "display": "flex",
-                    "alignItems": "center",
-                    "justifyContent": "center",   # centra horizontal
-                    "padding": "0"                # elimina padding
-                }
-            })
-
+    ## SIDEBAR
     if sidebar:
         grid_options['sideBar'] = {
             "toolPanels": [
@@ -1218,6 +1240,97 @@ def easy_table(
             # "defaultToolPanel": "columns" # No poner para que renderice cerrada
             # "defaultToolPanel": None
         }
+
+    ## COLUMNS CONFIG LIST
+    if columns_list:
+        grid_options['columnDefs'] = _columns_config(columns_list=columns_list) #  or col.children
+
+        if select_checkbox:
+            grid_options['columnDefs'].insert(0, {
+                "headerName": "",
+                "field": "__selection__",
+                "checkboxSelection": True,
+                "headerCheckboxSelection": False,
+                "width": 40,
+                "maxWidth": 40,
+                "minWidth": 40,
+                "pinned": "left",
+                "sortable": False,
+                "resizable": False,
+                "filter": False,
+                "suppressCsvExport": True,
+                "suppressExcelExport": True,
+
+                "cellStyle": {
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",   # centra horizontal
+                    "padding": "0"                # elimina padding
+                }
+            })
+
+
+    exportable_columns = _extract_fields(grid_options["columnDefs"])
+    grid_options["defaultExcelExportParams"] = {
+        "columnKeys": exportable_columns,
+    }
+    grid_options["excelStyles"] = [
+        {
+            "id": "leftAlign",
+            "alignment": {"horizontal": "Left"}
+        }
+    ]
+
+    ## ROW GROUPING
+    if (row_grouping and len(columns_list) > 1 and sum(1 for x in columns_list if x.enableRowGroup) > 0):
+        grid_options['animateRows'] = True
+        grid_options['groupDefaultExpanded'] = 0 # 0 = todo colapsado / 1 = Se abre el primer nivel / -1 = Todo expandido (nivel aparece expandido por defecto)
+        grid_options['rowGroupPanelShow'] = 'always' # never / always / onlyWhenGrouping (Cuando se ve el menu superior para agrupar)
+        grid_options['showOpenedGroup'] = True
+        grid_options['suppressAggFuncInHeader'] = False
+        grid_options['autoGroupColumnDef'] = {
+            "headerName": 'Agrupacion', # Nombre de la columna agrupacion
+            "width": 320,
+            "suppressSizeToFit": True, #PARA QUE NO SE AJUSTE
+            # "pinned": "left", #ESTE PINNED NO SE PONE, porque al ponerlo la columna de agrupacion se pone mas a la izda que el checkbox ->FEO
+            "cellRendererParams": {"suppressCount": False},
+            "cellStyle": cell_style.to_dict(),
+        }
+
+
+    # ---------------------------------------------------------------
+    #  TREE DATA
+    #----------------------------------------------------------------
+    #Nombre y ancho de la columna agrupada (de momento HARD-CODED)
+    # auto_tree_name = "Nivel"
+    # auto_tree_width = 60
+
+
+    # if tree_data:
+    #     if not tree_level_col:
+    #         raise ValueError("tree_data requires tree_level_col and tree_id_col")
+    #     df = build_hierarchy(df, level_col=tree_level_col)
+        
+    #     gb.configure_grid_options(
+    #         treeData=True,
+    #         animateRows=True,
+    #         getDataPath=JsCode("function(data) { return JSON.parse(data.hierarchy); }"),
+    #         groupDefaultExpanded=group_default_expanded,
+    #         autoGroupColumnDef={
+    #             "headerName": auto_tree_name,
+    #             "field": tree_level_col,
+    #             "width": auto_tree_width,
+    #             "suppressSizeToFit": True, #PARA QUE NO SE AJUSTE
+    #             # "pinned": "left", #ESTE PINNED NO SE PONE, porque al ponerlo la columna de agrupacion se pone mas a la izda que el checkbox ->FEO
+    #             "cellRendererParams": {"suppressCount": False},
+    #             "cellStyle": cell_style.to_dict(),
+    #         },
+    #     )
+
+    # ---------------------------------------------------------------
+    #  TREE DATA
+    #----------------------------------------------------------------
+
 
 
     ## TABLE

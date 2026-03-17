@@ -23,6 +23,7 @@ from easy_st_aggrid.columns_config import \
     col_base, \
     col_text, \
     col_date, \
+    col_date_new, \
     col_status_new, \
     col_bool, \
     col_bar, \
