@@ -62,7 +62,6 @@ default_header = cell_style(
 
 
 ## COLUMNS TYPES
-
 @dataclass
 class col_base:
     '''
@@ -119,8 +118,11 @@ class col_base:
         '''
         col_options = dict()
 
-        col_options['field'] = self.id
-        col_options["headerTooltip"] = self.id
+        if self.id is not None:
+            col_options['field'] = self.id
+            col_options["headerTooltip"] = self.id
+        elif self.alias is not None:
+            col_options["headerTooltip"] = self.alias
 
         if self.alias != None:
             col_options["headerName"] = self.alias

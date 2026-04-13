@@ -33,3 +33,5 @@ from easy_st_aggrid.table import easy_table
 
 ## CUSTOM COLUMNS
 from easy_st_aggrid.col_status import col_status
+from easy_st_aggrid.col_bar import col_bar
+from easy_st_aggrid.col_icon import col_icon

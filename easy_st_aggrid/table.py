@@ -51,32 +51,29 @@ def _extract_fields(column_defs, exclude_prefix="__"):
 #     DARK = "dark"
 
 def build_column_defs(df, columns_list: Optional[List[col_base]] = None) -> List[Dict]:
-    # 1. Mapear configs custom por id
-    custom_map = {col.id: col for col in columns_list} if columns_list else {}
-
-    column_defs = []
-
-    # 2. Recorrer columnas reales del dataframe
-    for col_name in df.columns:
-        if col_name in custom_map:
-            # aplicar config personalizada
-            # column_defs.append(custom_map[col_name].data())
-            col_def  = custom_map[col_name].data()
-
-            # 👇 fallback si no viene definido
-            if "headerTooltip" not in col_def:
-                col_def ["headerTooltip"] = col_name
-        else:
-            # dejar comportamiento por defecto de aggrid
-            # column_defs.append({
-            #     "field": col_name,
-            #     "headerTooltip": col_name
-            # })
-            col_def  = {
+    # Sin configuracion custom: todas las columnas planas del dataframe
+    if not columns_list:
+        return [
+            {
                 "field": col_name,
-                "headerTooltip": col_name
+                "headerTooltip": col_name,
             }
-        column_defs.append(col_def)
+            for col_name in df.columns
+        ]
+
+    # Con configuracion custom: respetar jerarquia (children) y orden definidos
+    column_defs = [col.data() for col in columns_list]
+
+    # Mantener compatibilidad: anadir al final columnas del df no configuradas
+    configured_ids = set(_extract_fields(column_defs))
+    for col_name in df.columns:
+        if col_name not in configured_ids:
+            column_defs.append(
+                {
+                    "field": col_name,
+                    "headerTooltip": col_name,
+                }
+            )
 
     return column_defs
 
@@ -150,7 +147,7 @@ def easy_table(
     gb.configure_selection(
         # selection_mode="multiple" if selection_multiple else "single", # single / multiple
         # use_checkbox=select_checkbox,
-        header_checkbox=True
+        header_checkbox=selection_multiple
     )
 
     # DEFAULT CONFIG
@@ -251,6 +248,11 @@ def easy_table(
     ## DEFAULT STYLE
     grid_options['defaultColDef']["headerStyle"] = header_style.to_dict()
     grid_options['defaultColDef']["cellStyle"] = cell_style.to_dict()
+
+    # Ag-Grid aplica estilos de grupos en defaultColGroupDef, no en defaultColDef.
+    # Esto mantiene font-size/font-weight consistentes entre headers normales y de grupo.
+    grid_options.setdefault("defaultColGroupDef", {})
+    grid_options["defaultColGroupDef"]["headerStyle"] = header_style.to_dict()
     # grid_options['getRowStyle'] = row_style_js  # gb.configure_grid_options(getRowStyle=row_style_js)
     
     # if getRowStyle:
@@ -266,32 +268,6 @@ def easy_table(
     #     "resizable": False,
     #     "filter": False
     # })
-
-    ## CHECKBOX
-    if select_checkbox:
-        grid_options['columnDefs'].insert(0, {
-            "headerName": "",
-            "field": "__selection__",
-            "checkboxSelection": True,
-            "headerCheckboxSelection": True,
-            "headerCheckboxSelectionFilteredOnly": False,
-            "width": 50,
-            "maxWidth": 50,
-            "minWidth": 50,
-            "pinned": "left",
-            "sortable": False,
-            "resizable": False,
-            "filter": False,
-            "suppressCsvExport": True,
-            "suppressExcelExport": True,
-
-            "cellStyle": {
-                "display": "flex",
-                "alignItems": "center",
-                "justifyContent": "center",   # centra horizontal
-                "padding": "0"                # elimina padding
-            }
-        })
 
     ## STATUSBAR
     if statusbar:
@@ -349,6 +325,32 @@ def easy_table(
     if columns_list:
         # grid_options['columnDefs'] = _columns_config(columns_list=columns_list) #  or col.children
         grid_options['columnDefs'] = build_column_defs(df, columns_list)
+
+    ## CHECKBOX
+    if select_checkbox:
+        grid_options['columnDefs'].insert(0, {
+            "headerName": "",
+            "field": "__selection__",
+            "checkboxSelection": True,
+            "headerCheckboxSelection": selection_multiple,
+            "headerCheckboxSelectionFilteredOnly": selection_multiple,
+            "width": 50,
+            "maxWidth": 50,
+            "minWidth": 50,
+            "pinned": "left",
+            "sortable": False,
+            "resizable": False,
+            "filter": False,
+            "suppressCsvExport": True,
+            "suppressExcelExport": True,
+
+            "cellStyle": {
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "center",   # centra horizontal
+                "padding": "0"                # elimina padding
+            }
+        })
 
 
     exportable_columns = _extract_fields(grid_options["columnDefs"])
@@ -462,3 +464,4 @@ def easy_table(
         # theme=_theme if theme in [Theme.DARK, Theme.LIGHT] else 'streamlit',
         theme=_theme if theme in ['dark', 'light'] else 'streamlit', # streamlit / alpine / balham
     )
+
