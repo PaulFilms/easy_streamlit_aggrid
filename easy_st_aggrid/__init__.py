@@ -5,9 +5,9 @@ Columns
 -------
 col_base
 col_text
-col_date
-col_checkbox
-col_status ** Under Test
+col_bool
+col_str_date
+col_status
 
 Style
 -----
@@ -18,27 +18,18 @@ Table
 easy_table
 '''
 from ._version import __version__
-from .icons import Icons
-from easy_st_aggrid.columns_config import \
+from st_aggrid import JsCode
+
+from easy_st_aggrid.defaults import \
+    cell_style, \
+    default_cell, \
+    default_header, \
     col_base, \
     col_text, \
-    col_date, \
-    col_date_new, \
-    col_status_new, \
     col_bool, \
-    col_bar, \
-    col_status, \
-    col_progress, \
-    col_icon, \
-    cell_style, \
-    JsCode, \
-    easy_table
+    col_str_date
 
-## BUG: circular import when importing all the functions in columns_config.py
-# import importlib
+from easy_st_aggrid.table import easy_table
 
-# def __getattr__(name):
-#     if name in __all__:
-#         mod = importlib.import_module(".columns_config", __name__)
-#         return getattr(mod, name)
-#     raise AttributeError(f"module {__name__} has no attribute {name}")
+## CUSTOM COLUMNS
+from easy_st_aggrid.col_status import col_status
