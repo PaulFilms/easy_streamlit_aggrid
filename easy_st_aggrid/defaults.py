@@ -291,17 +291,24 @@ class col_str_date(col_base):
         self.kwargs = dict(self.kwargs) if self.kwargs else {}
 
         # Renderer: show empty for null, otherwise string
-        self.kwargs["cellRenderer"] = JsCode("""
-        function(params) {
-            const val = params.value;
-            if (!val) return '';
-            return val;
-        }
-        """)
-
-        # Center cell
-        # self.kwargs["cellStyle"] = {
-        #     "display": "flex",
-        #     "justifyContent": "center",
-        #     "alignItems": "center",
+        # self.kwargs["cellRenderer"] = JsCode("""
+        # function(params) {
+        #     const val = params.value;
+        #     if (!val) return '';
+        #     return val;
         # }
+        # """)
+        # self.kwargs["cellRenderer"] = JsCode("""
+        # function(params) {
+        #     const val = params.value;
+        #     if (!val || val === '2200-01-01') return '--';
+        #     return val;
+        # }
+        # """)
+
+        ## Center cell
+        self.kwargs["cellStyle"] = {
+            "display": "flex",
+            "justifyContent": "center",
+            "alignItems": "center",
+        }

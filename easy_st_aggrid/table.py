@@ -78,7 +78,8 @@ def build_column_defs(df, columns_list: Optional[List[col_base]] = None) -> List
     return column_defs
 
 def easy_table(
-        dataframe: 'pd.DataFrame', 
+        dataframe: 'pd.DataFrame',
+        key: str = None,
         columns_list: List[col_base] = None, 
         cell_style: cell_style = default_cell,
         header_style: cell_style = default_header,
@@ -365,7 +366,7 @@ def easy_table(
     ]
 
     ## ROW GROUPING
-    if (row_grouping and len(columns_list) > 1 and sum(1 for x in columns_list if x.enableRowGroup) > 0):
+    if (row_grouping and columns_list and len(columns_list) > 1 and sum(1 for x in columns_list if x.enableRowGroup) > 0):
         grid_options['animateRows'] = True
         grid_options['groupDefaultExpanded'] = 0 # 0 = todo colapsado / 1 = Se abre el primer nivel / -1 = Todo expandido (nivel aparece expandido por defecto)
         grid_options['rowGroupPanelShow'] = 'always' # never / always / onlyWhenGrouping (Cuando se ve el menu superior para agrupar)
@@ -452,6 +453,7 @@ def easy_table(
     return AgGrid(
         data=df,
         gridOptions=grid_options,
+        key=key,
         enable_enterprise_modules=enterprise,  # necesario para aggregation
         allow_unsafe_jscode=True,
 
@@ -463,5 +465,7 @@ def easy_table(
         # theme='dark' if dark_theme else 'light',
         # theme=_theme if theme in [Theme.DARK, Theme.LIGHT] else 'streamlit',
         theme=_theme if theme in ['dark', 'light'] else 'streamlit', # streamlit / alpine / balham
+        
+        # update_on=['selectionChanged'],
     )
 
